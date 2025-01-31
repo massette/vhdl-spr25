@@ -68,6 +68,8 @@ architecture CenterPattern_ARCH of CenterPattern is
     signal maskRight: std_logic_vector(7 downto 0);
 begin
     -- generate pattern on left bits, as if (directionMode = 0)
+    -- in : countBits
+    -- out: maskLeft
     MAKE_LEFT: with countBits select
         maskLeft  <= LEFT_ZERO   when BITS_ZERO,
                      LEFT_ONE    when BITS_ONE,
@@ -79,6 +81,8 @@ begin
                      LEFT_SEVEN  when others;
 
     -- generate pattern on right bits, as if (directionMode = 1)
+    -- in : countBits
+    -- out: maskRight
     MAKE_RIGHT: with countBits select
         maskRight <= RIGHT_ZERO  when BITS_ZERO,
                      RIGHT_ONE   when BITS_ONE,

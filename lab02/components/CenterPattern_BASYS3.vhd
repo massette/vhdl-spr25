@@ -38,6 +38,8 @@ architecture CenterPattern_BASYS3_ARCH of CenterPattern_BASYS3 is
     end component;
 begin
     -- map design to hardware
+    -- in : sw, btnD
+    -- out: led
     UUT: CenterPattern port map(
         countBits => sw,
         directionMode => btnD,

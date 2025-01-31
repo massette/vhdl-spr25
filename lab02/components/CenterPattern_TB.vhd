@@ -113,6 +113,9 @@ architecture CenterPattern_TB_ARCH of CenterPattern_TB is
     signal directionMode: std_logic;
     signal mask: std_logic_vector(15 downto 0);
 begin
+    -- generate test inputs
+    -- in : .
+    -- out: countBits, directionBits
     DRIVE_INPUTS: process is
     begin
         -- initialize signals
@@ -136,6 +139,7 @@ begin
         wait;
     end process;
     
+    -- map test signals
     UUT: CenterPattern port map(
         countBits => countBits,
         directionMode => directionMode,

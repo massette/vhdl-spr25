@@ -7,8 +7,8 @@
 --     Count is set to zero on reset.
 --
 --     Inputs:
---       'reset' when active, all sequential elements are put in initial state
---       'clock' on its rising edge, all sequential elements are updated
+--       'reset' when active, all sequential elements return to initial state
+--       'clock' on rising edge, all sequential elements are updated
 --       'countEnRaw' represents a raw button input. When pressed, internal
 --           count increases exactly once.
 --         
