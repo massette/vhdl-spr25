@@ -1,6 +1,6 @@
-<mxfile host="Electron" agent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) draw.io/26.0.4 Chrome/128.0.6613.186 Electron/32.2.5 Safari/537.36" version="26.0.4">
+<mxfile host="app.diagrams.net" agent="Mozilla/5.0 (X11; Ubuntu; Linux x86_64; rv:134.0) Gecko/20100101 Firefox/134.0" version="26.0.10">
   <diagram name="Page-1" id="qsbnJeBw_hMP2xTk_HLg">
-    <mxGraphModel dx="472" dy="820" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="850" pageHeight="1100" math="0" shadow="0">
+    <mxGraphModel dx="724" dy="515" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="850" pageHeight="1100" math="0" shadow="0">
       <root>
         <mxCell id="0" />
         <mxCell id="1" parent="0" />
@@ -107,8 +107,8 @@
             </Array>
           </mxGeometry>
         </mxCell>
-        <mxCell id="AATds2I5sKl3luiFkeHi-25" value="countDigits" style="text;html=1;align=left;verticalAlign=bottom;whiteSpace=wrap;rounded=0;fontFamily=Lucida Console;fontStyle=0" parent="1" vertex="1">
-          <mxGeometry x="461" y="160" width="70" height="20" as="geometry" />
+        <mxCell id="AATds2I5sKl3luiFkeHi-25" value="countDigits" style="text;html=1;align=center;verticalAlign=bottom;whiteSpace=wrap;rounded=0;fontFamily=Lucida Console;fontStyle=0" parent="1" vertex="1">
+          <mxGeometry x="450" y="160" width="110" height="20" as="geometry" />
         </mxCell>
         <mxCell id="AATds2I5sKl3luiFkeHi-27" value="8" style="text;html=1;align=center;verticalAlign=bottom;whiteSpace=wrap;rounded=0;fontFamily=Lucida Console;fontStyle=0" parent="1" vertex="1">
           <mxGeometry x="470" y="206.75" width="61" height="20" as="geometry" />
@@ -316,7 +316,7 @@
             <mxPoint x="1053.26" y="240" as="targetPoint" />
           </mxGeometry>
         </mxCell>
-        <mxCell id="AATds2I5sKl3luiFkeHi-86" value="&quot;----&quot;" style="text;html=1;align=left;verticalAlign=bottom;whiteSpace=wrap;rounded=0;fontFamily=Lucida Console;fontStyle=0" parent="1" vertex="1">
+        <mxCell id="AATds2I5sKl3luiFkeHi-86" value="&quot;0000&quot;" style="text;html=1;align=left;verticalAlign=bottom;whiteSpace=wrap;rounded=0;fontFamily=Lucida Console;fontStyle=0" parent="1" vertex="1">
           <mxGeometry x="1000" y="240" width="50.26" height="20" as="geometry" />
         </mxCell>
         <mxCell id="AATds2I5sKl3luiFkeHi-87" value="" style="endArrow=none;html=1;rounded=0;entryX=-0.006;entryY=0.419;entryDx=0;entryDy=0;entryPerimeter=0;fontStyle=0" parent="1" edge="1">
@@ -331,7 +331,7 @@
             <mxPoint x="1053.52" y="261.5" as="targetPoint" />
           </mxGeometry>
         </mxCell>
-        <mxCell id="AATds2I5sKl3luiFkeHi-89" value="&quot;----&quot;" style="text;html=1;align=left;verticalAlign=bottom;whiteSpace=wrap;rounded=0;fontFamily=Lucida Console;fontStyle=0" parent="1" vertex="1">
+        <mxCell id="AATds2I5sKl3luiFkeHi-89" value="&quot;0000&quot;" style="text;html=1;align=left;verticalAlign=bottom;whiteSpace=wrap;rounded=0;fontFamily=Lucida Console;fontStyle=0" parent="1" vertex="1">
           <mxGeometry x="1000" y="261.5" width="50.52" height="20" as="geometry" />
         </mxCell>
         <mxCell id="AATds2I5sKl3luiFkeHi-90" value="blankTens" style="text;html=1;align=left;verticalAlign=bottom;whiteSpace=wrap;rounded=0;fontFamily=Lucida Console;fontStyle=0" parent="1" vertex="1">
@@ -355,7 +355,7 @@
             <mxPoint x="505" y="111.5" as="targetPoint" />
           </mxGeometry>
         </mxCell>
-        <mxCell id="LQGJWqhdvz3SOWZLcNF4-5" value="" style="endArrow=none;html=1;rounded=0;strokeWidth=1;fontStyle=0" parent="1" edge="1">
+        <mxCell id="LQGJWqhdvz3SOWZLcNF4-5" value="" style="endArrow=none;html=1;rounded=0;strokeWidth=1;fontStyle=0;align=center;" parent="1" edge="1">
           <mxGeometry width="50" height="50" relative="1" as="geometry">
             <mxPoint x="496" y="203" as="sourcePoint" />
             <mxPoint x="505" y="181" as="targetPoint" />

@@ -36,8 +36,11 @@ architecture Counter_BASYS3_ARCH of Counter_BASYS3 is
     -----------------------------------------------------------------CONSTANTS--
     constant ACTIVE: std_logic := '1';
     
+    -- when low input is followed by a high, signal has just gone high
+    constant FIRST_ACTIVE: std_logic_vector(1 downto 0) := (ACTIVE, not ACTIVE);
+    
     -- bcd literals
-    constant BCD_BLANK: std_logic_vector(3 downto 0) := "----";
+    constant BCD_BLANK: std_logic_vector(3 downto 0) := "0000";
     
     ----------------------------------------------------------------COMPONENTS--
     -- uut: counter
@@ -46,7 +49,7 @@ architecture Counter_BASYS3_ARCH of Counter_BASYS3 is
             clock: in std_logic;
             reset: in std_logic;
             
-            countEnRaw: in std_logic;
+            countEn: in std_logic;
             
             digits: out std_logic_vector(7 downto 0); -- bcd tens (15:8), ones (7:0)
             mask: out std_logic_vector(15 downto 0)
@@ -95,11 +98,38 @@ begin
     reset <= btnD;
     
     -- map counter component
+    -- synchronize async button input and trigger on first cycle high
+    -- note, physical_io_package has components for this
+    -- in : btnR
+    -- out: countEn
+    CLEAN_INPUT: process (reset, clock) is
+        -- buffer of the last 4 inputs
+        -- introduces a small delay for inputs to propogate
+        variable inputs: std_logic_vector(3 downto 0);
+    begin
+        if (reset = ACTIVE) then
+            -- on reset, saturate the buffer with low inputs
+            countEn <= not ACTIVE;
+            inputs := (others => not ACTIVE);
+        elsif rising_edge(clock) then
+            -- shift next input into buffer
+            inputs := btnR & inputs(3 downto 1);
+            
+            -- count only when the button is first pressed
+            -- note, effectively shortens the synchronizer chain by 2
+            if (inputs(1 downto 0) = FIRST_ACTIVE) then
+                countEn <= ACTIVE;
+            else
+                countEn <= (not ACTIVE);
+            end if;
+        end if;
+    end process;
+    
     UUT: Counter port map(
         clock => clock,
         reset => reset,
         
-        countEnRaw => btnR,
+        countEn => countEn,
         
         digits => countDigits,
         mask => led -- drive led output
