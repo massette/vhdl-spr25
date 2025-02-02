@@ -125,6 +125,9 @@ begin
         end if;
     end process;
     
+    -- map UUT to hardware
+    -- in : (clock, reset) countEn
+    -- out: countDigits, led
     UUT: Counter port map(
         clock => clock,
         reset => reset,

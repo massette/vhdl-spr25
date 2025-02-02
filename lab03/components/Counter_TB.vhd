@@ -104,15 +104,21 @@ architecture Counter_TB_ARCH of Counter_TB is
     signal digits: std_logic_vector(7 downto 0);
     signal mask: std_logic_vector(15 downto 0);
 begin
+    -- generate reset signal for synchronous elements
+    -- out: reset
     DRIVE_RESET: process is
     begin
+        -- reset to known state before running any tests
         reset <= ACTIVE;
         wait for 17 ns;
         
+        -- keep low for rest of test
         reset <= not ACTIVE;
         wait;
     end process;
     
+    -- generate clock for synchronous elements
+    -- out: clock
     DRIVE_CLOCK: process is
     begin
         clock <= not ACTIVE;
@@ -124,6 +130,9 @@ begin
         -- note, processes unterminated by a wait will repeat indefinitely
     end process;
     
+    -- generate test inputs for counter
+    -- in : clock
+    -- out: countEn
     DRIVE_INPUTS: process is
     begin
         -- initalize signals
@@ -133,7 +142,7 @@ begin
         wait until (reset = not ACTIVE);
         wait until rising_edge(clock);
         
-        -- wait a little longer
+        -- wait a little longer to avoid 0-width inputs
         wait for STEP_TIME;
         
         -- run all tests
@@ -161,6 +170,7 @@ begin
         wait;
     end process;
     
+    -- map counter to test signals
     UUT: Counter port map(
         clock => clock,
         reset => reset,
