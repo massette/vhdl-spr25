@@ -15,22 +15,28 @@
 --          reaching end of current sequence
 --     
 --     Outputs:
---       'random' next term in the sequeunce, resets to 0
+--       'term' next term in the sequeunce, resets to 0
+--       'lastMode' high when on the last term of the sequence
 --     
 --------------------------------------------------------------------------------
 
-entity PatternGenerator is
+library ieee;
+use ieee.std_logic_1164.all;
+use ieee.numeric_std.all;
+
+entity SequenceGenerator is
     port(
         reset: in std_logic;
         clock: in std_logic;
         
         nextEn: in std_logic;
 
-        random: out std_logic_vector(15 downto 0)
+        term: out std_logic_vector(3 downto 0);
+        lastMode: out std_logic
     );
-end PatternGenerator;
+end SequenceGenerator;
 
-architecture PatternGenerator_ARCH of PatternGenerator is
+architecture SequenceGenerator_ARCH of SequenceGenerator is
     -----------------------------------------------------------------CONSTANTS--
     constant ACTIVE: std_logic := '1';
 
@@ -38,7 +44,11 @@ architecture PatternGenerator_ARCH of PatternGenerator is
     constant MAX: integer := (2 ** 20) - 1;
 
     -------------------------------------------------------------------SIGNALS--
+    -- make seed
+    signal holdMode: std_logic;
     signal seed: integer range 0 to MAX;
+    
+    -- make sequence
     signal termsBits: std_logic_vector(19 downto 0);
 begin
     -- counter running in background to seed random generator
@@ -70,7 +80,7 @@ begin
         variable seedBits: std_logic_vector(19 downto 0);
     begin
         -- convert random seed to bit string
-        seedBits <= std_logic_vector(to_unsigned(seed, 20));
+        seedBits := std_logic_vector(to_unsigned(seed, 20));
 
         -- rearrange bits to mitigate slower effect of higher bits
         -- note, this yields a unique output for every valid seed,
@@ -94,10 +104,11 @@ begin
     end process;
 
     -- output next term in sequence, or select new sequence
+    -- *might split into several blocks
     -- in : nextEn, termsBits
-    -- out: random, holdMode
+    -- out: term, holdMode, lastMode
     SELECT_TERM: process (reset, clock) is
-        variable current: integer range 0 to 5;
+        variable current: integer range 0 to 4;
     begin
         if (reset = ACTIVE) then
             -- reset to first term
@@ -116,7 +127,14 @@ begin
             end if;
             
             -- output current term from random bits
-            random <= termsBits((current*4 + 3) downto (current * 4));
+            term <= termsBits((current*4 + 3) downto (current * 4));
+            
+            -- output if on the last term
+            if (current = 4) then
+                lastMode <= ACTIVE;
+            else
+                lastMode <= (not ACTIVE);
+            end if;
             
             -- stop randomizing if in the middle of a sequence
             if (current /= 0) then
@@ -126,4 +144,4 @@ begin
             end if;
         end if;
     end process;
-end PatternGenerator_ARCH;
+end SequenceGenerator_ARCH;

@@ -22,16 +22,17 @@
 
 library ieee;
 use ieee.std_logic_1164.all;
+use ieee.numeric_std.all;
 
 entity SequenceGenerator_BASYS3 is
     port(
-        clk: std_logic;
+        clk: in std_logic;
         
-        btnD: std_logic;
-        btnR: std_logic;
-        sw: std_logic_vector(15 downto 0);
+        btnD: in std_logic;
+        btnR: in std_logic;
+        sw: in std_logic_vector(15 downto 0);
 
-        led: std_logic_vector(15 downto 0)
+        led: out std_logic_vector(15 downto 0)
     );
 end SequenceGenerator_BASYS3;
 
@@ -55,12 +56,16 @@ architecture SequenceGenerator_BASYS3_ARCH of SequenceGenerator_BASYS3 is
         
             nextEn: in std_logic;
 
-            random: out std_logic_vector(15 downto 0);
-            lastTermMode: out std_logic
+            term: out std_logic_vector(3 downto 0);
+            lastMode: out std_logic
         );
     end component;
 
     -------------------------------------------------------------------SIGNALS--
+    -- async signals
+    signal reset: std_logic;
+    signal clock: std_logic;
+    
     -- handle inputs
     signal readyEn: std_logic;
 
@@ -76,7 +81,7 @@ architecture SequenceGenerator_BASYS3_ARCH of SequenceGenerator_BASYS3 is
     -- sequence generator
     signal seqNextEn: std_logic;
     signal seqTerm: std_logic_vector(3 downto 0);
-    signal lastTermMode: std_logic;
+    signal seqLastMode: std_logic;
 begin
     -- map asynchronous signals
     reset <= btnD;
@@ -88,8 +93,8 @@ begin
     SYNC_READY: process (reset, clock) is
         variable inputs: std_logic_vector(3 downto 0);
     begin
-        readyEn <= input(0);
-        inputs := btnD & prev(3 downto 1);
+        readyEn <= inputs(0);
+        inputs := btnR & inputs(3 downto 1);
     end process;
     
     -- generate 4Hz pulse signal
@@ -101,10 +106,10 @@ begin
         if (reset = ACTIVE) then
             -- reset to low
             count := 0;
-            countEn <= (not ACTIVE);
+            timerEn <= (not ACTIVE);
         elsif rising_edge(clock) then
             -- set defaults
-            countEn <= (not ACTIVE);
+            timerEn <= (not ACTIVE);
 
             -- update counter
             if (count < (TIMER_PERIOD / CLOCK_PERIOD)) then
@@ -113,7 +118,7 @@ begin
             else
                 -- set high on overflow
                 count := 0;
-                countEn <= ACTIVE;
+                timerEn <= ACTIVE;
             end if;
         end if;
     end process;
@@ -180,7 +185,7 @@ begin
 
         nextEn => seqNextEn,
         
-        randomOut => seqTerm,
+        term => seqTerm,
         lastMode => seqLastMode
     );
 
@@ -188,9 +193,13 @@ begin
     -- in : seqTerm
     -- out: led
     DRIVE_LED: process (seqTerm) is
+        variable index: integer range 0 to 15;
     begin
+        -- convert to integer index
+        index := to_integer(unsigned(seqTerm));
+        
         -- turn off all leds, except current term
         led <= (others => not ACTIVE);
-        led(seqTerm) <= ACTIVE;
+        led(index) <= ACTIVE;
     end process;
 end SequenceGenerator_BASYS3_ARCH;
