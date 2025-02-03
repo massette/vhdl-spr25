@@ -97,7 +97,6 @@ begin
     clock <= clk;
     reset <= btnD;
     
-    -- map counter component
     -- synchronize async button input and trigger on first cycle high
     -- note, physical_io_package has components for this
     -- in : btnR
@@ -125,7 +124,7 @@ begin
         end if;
     end process;
     
-    -- map UUT to hardware
+    -- map counter to hardware
     -- in : (clock, reset) countEn
     -- out: countDigits, led
     UUT: Counter port map(
