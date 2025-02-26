@@ -19,7 +19,11 @@
 --     
 --------------------------------------------------------------------------------
 
-entity PatternGenerator is
+library ieee;
+use ieee.std_logic_1164.all;
+use ieee.numeric_std.all;
+
+entity SequenceGenerator is
     port(
         reset: in std_logic;
         clock: in std_logic;
@@ -32,9 +36,9 @@ entity PatternGenerator is
         random4: out std_logic_vector(3 downto 0);
         random5: out std_logic_vector(3 downto 0)
     );
-end PatternGenerator;
+end SequenceGenerator;
 
-architecture PatternGenerator_ARCH of PatternGenerator is
+architecture SequenceGenerator_ARCH of SequenceGenerator is
     -----------------------------------------------------------------CONSTANTS--
     constant ACTIVE: std_logic := '1';
 
@@ -42,7 +46,11 @@ architecture PatternGenerator_ARCH of PatternGenerator is
     constant MAX: integer := (2 ** 20) - 1;
 
     -------------------------------------------------------------------SIGNALS--
+    -- make seed
+    signal holdMode: std_logic;
     signal seed: integer range 0 to MAX;
+    
+    -- make sequence
     signal termsBits: std_logic_vector(19 downto 0);
 begin
     -- counter always running to generate seed

@@ -23,10 +23,11 @@
 
 library ieee;
 use ieee.std_logic_1164.all;
+use ieee.numeric_std.all;
 
 entity SequenceGenerator_BASYS3 is
     port(
-        clk: std_logic;
+        clk: in std_logic;
         
         btnD: std_logic;
         btnR: std_logic;
@@ -66,6 +67,10 @@ architecture SequenceGenerator_BASYS3_ARCH of SequenceGenerator_BASYS3 is
     end component;
 
     -------------------------------------------------------------------SIGNALS--
+    -- async signals
+    signal reset: std_logic;
+    signal clock: std_logic;
+    
     -- handle inputs
     signal readyEn: std_logic;
 
@@ -249,7 +254,11 @@ begin
     -- in : currentTerm
     -- out: led
     DRIVE_LED: process (seqTerm) is
+        variable index: integer range 0 to 15;
     begin
+        -- convert to integer index
+        index := to_integer(unsigned(seqTerm));
+        
         -- turn off all leds, except current term
         led <= (others => not ACTIVE);
         led(currentTerm) <= ACTIVE;

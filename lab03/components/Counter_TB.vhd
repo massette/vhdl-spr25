@@ -63,10 +63,10 @@ architecture Counter_TB_ARCH of Counter_TB is
     -- uut: counter
     component Counter is
         port(
-            clock: in std_logic;
             reset: in std_logic;
+            clock: in std_logic;
             
-            countEnRaw: in std_logic;
+            countEn: in std_logic;
             
             digits: out std_logic_vector(7 downto 0); -- bcd tens (15:8), ones (7:0)
             mask: out std_logic_vector(15 downto 0)
@@ -97,8 +97,8 @@ architecture Counter_TB_ARCH of Counter_TB is
     end function;
     
     -------------------------------------------------------------------SIGNALS--
-    signal clock: std_logic;
     signal reset: std_logic;
+    signal clock: std_logic;
     
     signal countEn: std_logic;
     signal digits: std_logic_vector(7 downto 0);
@@ -175,7 +175,7 @@ begin
         clock => clock,
         reset => reset,
         
-        countEnRaw => countEn,
+        countEn => countEn,
         
         digits => digits,
         mask => mask

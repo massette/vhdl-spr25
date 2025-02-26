@@ -23,8 +23,8 @@ use ieee.numeric_std.all;
 
 entity Counter is
     port(
-        clock: in std_logic;
         reset: in std_logic;
+        clock: in std_logic;
         
         countEn: in std_logic;
         

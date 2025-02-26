@@ -46,8 +46,8 @@ architecture Counter_BASYS3_ARCH of Counter_BASYS3 is
     -- uut: counter
     component Counter is
         port(
-            clock: in std_logic;
             reset: in std_logic;
+            clock: in std_logic;
             
             countEn: in std_logic;
             
@@ -128,8 +128,8 @@ begin
     -- in : (clock, reset) countEn
     -- out: countDigits, led
     UUT: Counter port map(
-        clock => clock,
         reset => reset,
+        clock => clock,
         
         countEn => countEn,
         
