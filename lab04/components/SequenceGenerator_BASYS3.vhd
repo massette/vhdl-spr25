@@ -4,19 +4,20 @@
 -- Sean Graham
 --
 --     Wrapper implementing the SequenceGenerator entity on the BASYS3 board.
---     For each sequence generated, the LEDs corresponding to the terms are lit
---     one at a time, switching at 4Hz. Upon reaching the end of a sequence,
---     waits for new input.
+--     For each sequence generated, the terms are displayed one at a time,
+--       switching at 4Hz. Upon reaching the end of a sequence, awaits input.
 --
 --     Inputs:
 --       'clk' system clock
 --       'btnD' on-board push button. resets generator to first seed
---       'btnR' on-board push button. if current sequence is done, begin next
---           sequence
+--       'btnR' on-board push button. if ready, selects next sequence
+--                                    otherwise, does nothing
 --
 --     Outputs:
---       'led' on-board leds. shows current term until end of current sequence,
---           otherwise unlit
+--       'seg' on-board seven-segment display. shows current term
+--       'led' on-board leds. shows current term
+--
+--             all outputs blanked when no sequence is selected
 --     
 --------------------------------------------------------------------------------
 
@@ -29,9 +30,10 @@ entity SequenceGenerator_BASYS3 is
         
         btnD: std_logic;
         btnR: std_logic;
-        sw: std_logic_vector(15 downto 0);
 
         led: std_logic_vector(15 downto 0)
+        seg: std_logic_vector(15 downto 0)
+        an: std_logic_vector(15 downto 0)
     );
 end SequenceGenerator_BASYS3;
 
@@ -52,11 +54,14 @@ architecture SequenceGenerator_BASYS3_ARCH of SequenceGenerator_BASYS3 is
         port(
             reset: in std_logic;
             clock: in std_logic;
-        
+            
             nextEn: in std_logic;
 
-            random: out std_logic_vector(15 downto 0);
-            lastTermMode: out std_logic
+            random1: out std_logic_vector(3 downto 0);
+            random2: out std_logic_vector(3 downto 0);
+            random3: out std_logic_vector(3 downto 0);
+            random4: out std_logic_vector(3 downto 0);
+            random5: out std_logic_vector(3 downto 0)
         );
     end component;
 
@@ -67,61 +72,44 @@ architecture SequenceGenerator_BASYS3_ARCH of SequenceGenerator_BASYS3 is
     -- timer
     signal timerEn: std_logic;
 
-    -- game state
+    -- sequence state
     signal currentState: t_SEQ_STATE;
     signal nextState: t_SEQ_STATE;
     
-    signal seqMode: std_logic; -- indicates we are currently in a sequence
+    signal loadSeqEn: std_logic;
+    signal showSeqMode: std_logic;
 
     -- sequence generator
-    signal seqNextEn: std_logic;
-    signal seqTerm: std_logic_vector(3 downto 0);
+    signal readyEn: std_logic;
+    signal seqTerm1: std_logic_vector(3 downto 0);
+    signal seqTerm2: std_logic_vector(3 downto 0);
+    signal seqTerm3: std_logic_vector(3 downto 0);
+    signal seqTerm4: std_logic_vector(3 downto 0);
+    signal seqTerm5: std_logic_vector(3 downto 0);
+
+    -- multiplex terms
+    signal currentTerm: integer range 0 to 15;
     signal lastTermMode: std_logic;
 begin
     -- map asynchronous signals
     reset <= btnD;
     clock <= clk;
 
-    -- synchronize asynchronous button input
+    -- synchronize and debounce asynchronous button input
     -- in : (reset, clock) btnD
     -- out: readyEn
-    SYNC_READY: process (reset, clock) is
-        variable inputs: std_logic_vector(3 downto 0);
-    begin
-        readyEn <= input(0);
-        inputs := btnD & prev(3 downto 1);
-    end process;
-    
-    -- generate 4Hz pulse signal
-    -- in : (reset, clock)
-    -- out: timerEn
-    MAKE_TIMER: process (reset, clock) is
-        variable count: integer range 0 to (TIMER_PERIOD / CLOCK_PERIOD);
-    begin
-        if (reset = ACTIVE) then
-            -- reset to low
-            count := 0;
-            countEn <= (not ACTIVE);
-        elsif rising_edge(clock) then
-            -- set defaults
-            countEn <= (not ACTIVE);
+    SYNC_READY: ButtonTrigger port map(
+        reset => reset,
+        clock => clock,
 
-            -- update counter
-            if (count < (TIMER_PERIOD / CLOCK_PERIOD)) then
-                -- increment counter
-                count := count + 1;
-            else
-                -- set high on overflow
-                count := 0;
-                countEn <= ACTIVE;
-            end if;
-        end if;
-    end process;
+        buttonRaw => btnR,
+        pulseEn => readyEn
+    );
 
     -- store and update state
     -- in : (reset, clock) nextState
     -- out: currentState
-    GAME_REG: process (reset, clock) is
+    SEQ_REG: process (reset, clock) is
     begin
         if (reset = ACTIVE) then
             -- wait for next input after reset
@@ -133,13 +121,14 @@ begin
     end process;
 
     -- determine state outputs and next state
-    -- in : currentState, readyEn, timerEn, seqLastMode
-    -- out: nextState, seqMode
-    GAME_TRANS: process (currentState) is
+    -- in : currentState, readyEn, nextEn, lastTermMode
+    -- out: loadSeqEn, 
+    SEQ_TRANS: process (currentState) is
     begin
         -- set defaults
         nextState <= currentState;
-        seqMode <= (not ACTIVE);
+        loadSeqEn <= (not ACTIVE);
+        showSeqMode <= (not ACTIVE);
         
         -- do current state logic
         case currentState is
@@ -152,45 +141,130 @@ begin
 
             ---------------------------------------------------------START_SEQ--
             when START_SEQ =>
-                -- synchronize with timer to avoid shortening first term
-                if (timerEn = ACTIVE) then
-                    nextState <= SHOW_SEQ;
-                end if;
+                -- load next sequence, prepare to display 
+                loadSeqEn <= ACTIVE;
+                nextState <= SHOW_SEQ;
 
             ----------------------------------------------------------SHOW_SEQ--
             when SHOW_SEQ =>
                 seqMode <= ACTIVE;
                 
-                -- wait for last term to be consumed
-                if (timerEn = ACTIVE) and (seqLastMode = ACTIVE) then
+                -- wait for last term to be displayed
+                if (timerEn = ACTIVE) and (lastTermMode = ACTIVE) then
                     nextState <= AWAIT_INPUT;
                 end if;
         end case;
     end process;
     
-    -- go to next term on timer when in a sequence
-    seqNextEn <= (timerEn and seqMode);
-    
+    -- generate 5Hz pulse signal
+    -- in : (reset, clock) loadSeqEn
+    -- out: nextEn
+    MAKE_TIMER: process (reset, clock) is
+        variable count: integer range 0 to (TIMER_PERIOD / CLOCK_PERIOD);
+    begin
+        if (reset = ACTIVE) then
+            -- reset to low
+            count := 0;
+            nextEn <= (not ACTIVE);
+        elsif rising_edge(clock) then
+            -- set default
+            nextEn <= (not ACTIVE);
+
+            if (loadSeqEn = ACTIVE) then
+                -- clear when loading a new sequence
+                count := 0;
+            elsif (count < (TIMER_PERIOD / CLOCK_PERIOD)) then
+                -- otherwise, increment counter
+                count := count + 1;
+            else
+                -- set ready on overflow
+                count := 0;
+                nextEn <= ACTIVE;
+            end if;
+        end if;
+    end process;
+
     -- map sequence generator to hardware
-    -- in : (reset, clock) nextEn
-    -- out: seqTerm, seqLastMode
+    -- in : (reset, clock) loadSeqEn
+    -- out: seqTerm1, seqTerm2, seqTerm3, seqTerm4, seqTerm5
     UUT: SequenceGenerator port map(
         reset => reset,
         clock => clock,
 
-        nextEn => seqNextEn,
-        
-        randomOut => seqTerm,
-        lastMode => seqLastMode
+        nextEn => loadSeqEn,
+
+        random1 => seqTerm1,
+        random2 => seqTerm2,
+        random3 => seqTerm3,
+        random4 => seqTerm4,
+        random5 => seqTerm5
     );
 
+    -- select current term in sequence
+    -- in : (reset, clock) nextEn
+    -- out: currentTerm, lastTermMode
+    SELECT_TERM: process (reset, clock) is
+        -- index of current term
+        variable i: integer range 1 to 5;
+    begin
+        if (reset = ACTIVE) then
+            i := 1;
+            currentTerm <= 0;
+            lastTermMode <= (not ACTIVE);
+        elsif rising_edge(clock) then
+            -- set default
+            lastTermMode <= (not ACTIVE);
+            
+            -- update index
+            if (loadSeqTerm = ACTIVE) then
+                -- clear when reading new sequence
+                i := 1;
+            elsif (nextEn = ACTIVE) then
+                -- increment index
+                if (i < 5) then
+                    i := i + 1;
+                else
+                    i := 1;
+                end if;
+            end if;
+
+            -- set current term
+            case (i) is
+                when 1 =>
+                    currentTerm <= seqTerm1;
+                when 2 =>
+                    currentTerm <= seqTerm2;
+                when 3 =>
+                    currentTerm <= seqTerm3;
+                when 4 =>
+                    currentTerm <= seqTerm4;
+                when others =>
+                    currentTerm <= seqTerm5;
+                    lastTermMode <= ACTIVE;
+            end case;
+        end if;
+    end process;
+
     -- drive led outputs
-    -- in : seqTerm
+    -- in : currentTerm
     -- out: led
     DRIVE_LED: process (seqTerm) is
     begin
         -- turn off all leds, except current term
         led <= (others => not ACTIVE);
-        led(seqTerm) <= ACTIVE;
+        led(currentTerm) <= ACTIVE;
     end process;
+
+    -- todo: drive seven seg output
+    DRIVE_SEG: SevenSegmentDriver port map(
+        reset => reset,
+        clock => clock,
+
+        -- ... digits
+
+        -- ... blanks
+
+        sevenSegs => seg,
+        anodes => an
+    );
 end SequenceGenerator_BASYS3_ARCH;

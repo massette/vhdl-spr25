@@ -15,7 +15,7 @@
 --          reaching end of current sequence
 --     
 --     Outputs:
---       'random' next term in the sequeunce, resets to 0
+--       'random1', 'random2', ... 'random5' terms of generated sequence
 --     
 --------------------------------------------------------------------------------
 
@@ -26,7 +26,11 @@ entity PatternGenerator is
         
         nextEn: in std_logic;
 
-        random: out std_logic_vector(15 downto 0)
+        random1: out std_logic_vector(3 downto 0);
+        random2: out std_logic_vector(3 downto 0);
+        random3: out std_logic_vector(3 downto 0);
+        random4: out std_logic_vector(3 downto 0);
+        random5: out std_logic_vector(3 downto 0)
     );
 end PatternGenerator;
 
@@ -41,8 +45,8 @@ architecture PatternGenerator_ARCH of PatternGenerator is
     signal seed: integer range 0 to MAX;
     signal termsBits: std_logic_vector(19 downto 0);
 begin
-    -- counter running in background to seed random generator
-    -- in : (clock, reset) holdMode
+    -- counter always running to generate seed
+    -- in : (clock, reset)
     -- out: seed
     MAKE_SEED: process (clock, reset) is
     begin
@@ -50,80 +54,46 @@ begin
             -- reset to 0
             seed <= 0;
         elsif rising_edge(clock) then
-            -- dont randomize if in the middle of a sequence
-            if (holdMode /= ACTIVE) then
-                if (seed < MAX) then
-                    -- increment count
-                    seed <= seed + 1;
-                else
-                    -- overflow to 0
-                    seed <= 0;
-                end if;
+            if (seed < MAX) then
+                -- increment count
+                seed <= seed + 1;
+            else
+                -- overflow to 0
+                seed <= 0;
             end if;
         end if;
     end process;
 
-    -- convert seed to a sequence of 20 pseudo-random bits
-    -- in : seed
-    -- out: termsBits
-    MAKE_SEQUENCE: process (seed) is
-        variable seedBits: std_logic_vector(19 downto 0);
-    begin
-        -- convert random seed to bit string
-        seedBits <= std_logic_vector(to_unsigned(seed, 20));
-
-        -- rearrange bits to mitigate slower effect of higher bits
-        -- note, this yields a unique output for every valid seed,
-        --    resulting in a uniform distribution of results
-
-        -- term 1
-        termsBits(19 downto 16) <= not seedBits(19) &     seedBits( 9)
-                                 & not seedBits( 0) &     seedBits(10);
-        -- term 2
-        termsBits(15 downto 12) <= not seedBits( 1) &     seedBits(18)
-                                 &     seedBits( 8) & not seedBits(11);
-        -- term 3
-        termsBits(11 downto  8) <=     seedBits(17) & not seedBits( 2)
-                                 &     seedBits(12) & not seedBits( 7);
-        -- term 4
-        termsBits( 7 downto  4) <=     seedBits(13) & not seedBits( 3)
-                                 & not seedBits( 6) &     seedBits(16);
-        -- term 5
-        termsBits( 3 downto  0) <= not seedBits( 5) &     seedBits(14)
-                                 & not seedBits(15) &     seedBits( 4);
-    end process;
-
-    -- output next term in sequence, or select new sequence
-    -- in : nextEn, termsBits
-    -- out: random, holdMode
-    SELECT_TERM: process (reset, clock) is
-        variable current: integer range 0 to 5;
+    -- latch current random seed as bit string
+    -- in : (reset, clock) nextEn
+    -- out: seedBits
+    process (reset, clock) is
     begin
         if (reset = ACTIVE) then
-            -- reset to first term
-            current := 0;
-            holdMode <= not ACTIVE;
+            seedBits <= (others => '0');
         elsif rising_edge(clock) then
             if (nextEn = ACTIVE) then
-                -- select next term
-                if (current < 5) then
-                    -- increment current
-                    current := current + 1;
-                else
-                    -- overflow back to zero
-                    current := 0;
-                end if;
-            end if;
-            
-            -- output current term from random bits
-            random <= termsBits((current*4 + 3) downto (current * 4));
-            
-            -- stop randomizing if in the middle of a sequence
-            if (current /= 0) then
-                holdMode <= ACTIVE;
-            else
-                holdMode <= not ACTIVE;
+                -- select next seed
+                seedBits <= std_logic_vector(to_unsigned(seed, 20));
             end if;
         end if;
     end process;
+
+    -- rearrange bits to mitigate slower effect of higher bits
+    -- note, this yields a unique output for every valid seed,
+    --    resulting in a uniform distribution of terms
+    random1 <= not seedBits(19) &     seedBits( 9)
+             & not seedBits( 0) &     seedBits(10);
+
+    random2 <= not seedBits( 1) &     seedBits(18)
+             &     seedBits( 8) & not seedBits(11);
+
+    random3 <=     seedBits(17) & not seedBits( 2)
+             &     seedBits(12) & not seedBits( 7);
+
+    random4 <=     seedBits(13) & not seedBits( 3)
+             & not seedBits( 6) &     seedBits(16);
+
+    random5 <= not seedBits( 5) &     seedBits(14)
+             & not seedBits(15) &     seedBits( 4);
 end PatternGenerator_ARCH;
