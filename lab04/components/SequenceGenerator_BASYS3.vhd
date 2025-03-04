@@ -5,12 +5,13 @@
 --
 --     Wrapper implementing the SequenceGenerator entity on the BASYS3 board.
 --     For each sequence generated, the terms are displayed one at a time,
---       switching at 4Hz. Upon reaching the end of a sequence, awaits input.
+--       switching at a frequency of 2Hz, outputs being blanked for last 100 ms.
+--     Upon reaching the end of a sequence, awaits input.
 --
 --     Inputs:
 --       'clk' system clock
 --       'btnD' on-board push button. resets generator to first seed
---       'btnR' on-board push button. if ready, selects next sequence
+--       'btnR' on-board push button. if ready, starts  next sequence
 --                                    otherwise, does nothing
 --
 --     Outputs:
@@ -29,25 +30,26 @@ entity SequenceGenerator_BASYS3 is
     port(
         clk: in std_logic;
         
-        btnD: std_logic;
-        btnR: std_logic;
+        btnD: in std_logic;
+        btnR: in std_logic;
 
-        led: std_logic_vector(15 downto 0)
-        seg: std_logic_vector(15 downto 0)
-        an: std_logic_vector(15 downto 0)
+        led: out std_logic_vector(15 downto 0);
+        seg: out std_logic_vector(6 downto 0);
+        an:  out std_logic_vector(3 downto 0)
     );
 end SequenceGenerator_BASYS3;
 
 architecture SequenceGenerator_BASYS3_ARCH of SequenceGenerator_BASYS3 is
     ----------------------------------------------------------TYPE DEFINITIONS--
-    type t_SEQ_STATE is (AWAIT_INPUT, START_SEQ, SHOW_SEQ);
+    type t_SEQ_STATE is (AWAIT_INPUT, START_SEQ, SHOW_TERM, NEXT_TERM);
 
     -----------------------------------------------------------------CONSTANTS--
     constant ACTIVE: std_logic := '1';
 
     -- timers
-    constant CLOCK_PERIOD: time := 1 ns;
-    constant TIMER_PERIOD: time := 200 ms;
+    constant CLOCK_PERIOD: time := 10 ns;
+    constant TIMER_PERIOD: time := 500 ms;
+    constant BLANK_PERIOD: time := 400 ms;
     
     ----------------------------------------------------------------COMPONENTS--
     -- button input
@@ -57,7 +59,7 @@ architecture SequenceGenerator_BASYS3_ARCH of SequenceGenerator_BASYS3 is
             clock: in std_logic;
 
             asyncIn: in std_logic;
-            syncOut: out std_logic;
+            syncOut: out std_logic
         );
     end component;
     
@@ -117,8 +119,9 @@ architecture SequenceGenerator_BASYS3_ARCH of SequenceGenerator_BASYS3 is
     signal btnRSync: std_logic;
     signal readyEn: std_logic;
 
-    -- timer
-    signal timerEn: std_logic;
+    -- timers
+    signal nextEn: std_logic;
+    signal hideEn: std_logic;
 
     -- sequence state
     signal currentState: t_SEQ_STATE;
@@ -128,7 +131,6 @@ architecture SequenceGenerator_BASYS3_ARCH of SequenceGenerator_BASYS3 is
     signal showSeqMode: std_logic;
 
     -- sequence generator
-    signal readyEn: std_logic;
     signal seqTerm1: std_logic_vector(3 downto 0);
     signal seqTerm2: std_logic_vector(3 downto 0);
     signal seqTerm3: std_logic_vector(3 downto 0);
@@ -137,13 +139,14 @@ architecture SequenceGenerator_BASYS3_ARCH of SequenceGenerator_BASYS3 is
 
     -- multiplex terms
     signal currentIndex: integer range 1 to 5;
-    signal currentTerm: integer range 0 to 15;
+    signal currentTerm: std_logic_vector(3 downto 0);
     signal lastTermMode: std_logic;
 
     -- seven segment driver
     signal segTens: std_logic_vector(3 downto 0);
     signal segOnes: std_logic_vector(3 downto 0);
     signal blankTens: std_logic;
+    signal blankOnes: std_logic;
 begin
     -- map asynchronous signals
     reset <= btnD;
@@ -187,8 +190,8 @@ begin
 
     -- determine state outputs and next state
     -- in : currentState, readyEn, nextEn, lastTermMode
-    -- out: loadSeqEn, 
-    SEQ_TRANS: process (currentState) is
+    -- out: nextState, loadSeqEn, showSeqMode
+    SEQ_TRANS: process (currentState, readyEn, hideEn, nextEn, lastTermMode) is
     begin
         -- set defaults
         nextState <= currentState;
@@ -208,23 +211,33 @@ begin
             when START_SEQ =>
                 -- load next sequence, prepare to display 
                 loadSeqEn <= ACTIVE;
-                nextState <= SHOW_SEQ;
+                nextState <= SHOW_TERM;
 
             ----------------------------------------------------------SHOW_SEQ--
-            when SHOW_SEQ =>
-                seqMode <= ACTIVE;
+            when SHOW_TERM =>
+                showSeqMode <= ACTIVE;
                 
                 -- wait for last term to be displayed
-                if (timerEn = ACTIVE) and (lastTermMode = ACTIVE) then
-                    nextState <= AWAIT_INPUT;
+                if (hideEn = ACTIVE) then
+                    if (lastTermMode = ACTIVE) then
+                        nextState <= AWAIT_INPUT;
+                    else
+                        nextState <= NEXT_TERM;
+                    end if;
+                end if;
+                
+            when NEXT_TERM =>
+                -- brief pause between terms
+                if (nextEn = ACTIVE) then
+                    nextState <= SHOW_TERM;
                 end if;
         end case;
     end process;
     
-    -- generate 5Hz pulse signal
+    -- generate 2Hz pulse signal, from beginning of sequence
     -- in : (reset, clock) loadSeqEn
     -- out: nextEn
-    MAKE_TIMER: process (reset, clock) is
+    MAKE_NEXT_TIMER: process (reset, clock) is
         variable count: integer range 0 to (TIMER_PERIOD / CLOCK_PERIOD);
     begin
         if (reset = ACTIVE) then
@@ -238,13 +251,39 @@ begin
             if (loadSeqEn = ACTIVE) then
                 -- clear when loading a new sequence
                 count := 0;
-            elsif (count < (TIMER_PERIOD / CLOCK_PERIOD)) then
+            elsif count < (TIMER_PERIOD / CLOCK_PERIOD) then
                 -- otherwise, increment counter
                 count := count + 1;
             else
                 -- set ready on overflow
                 count := 0;
                 nextEn <= ACTIVE;
+            end if;
+        end if;
+    end process;
+    
+    -- generate 2.5Hz pulse signal, from beginning of term
+    -- in : (reset, clock) nextEn
+    -- out: hideEn
+    MAKE_HIDE_TIMER: process(reset, clock) is
+        variable count: integer range 0 to (BLANK_PERIOD / CLOCK_PERIOD);
+    begin
+        if (reset = ACTIVE) then
+            hideEn <= (not ACTIVE);
+        elsif rising_edge(clock) then
+            -- set default
+            hideEn <= (not ACTIVE);
+            
+            if (nextEn = ACTIVE) then
+                -- clear when loading a new term
+                count := 0;
+            elsif count < (BLANK_PERIOD / CLOCK_PERIOD) then
+                -- otherwise, increment counter
+                count := count + 1;
+            else
+                -- set hide on overflow
+                count := 0;
+                hideEn <= ACTIVE;
             end if;
         end if;
     end process;
@@ -274,7 +313,7 @@ begin
             currentIndex <= 1;
         elsif rising_edge(clock) then
             -- update index
-            if (loadSeqTerm = ACTIVE) then
+            if (loadSeqEn = ACTIVE) then
                 -- clear when reading new sequence
                 currentIndex <= 1;
             elsif (nextEn = ACTIVE) then
@@ -299,7 +338,7 @@ begin
     -- check if we're on the final term of the sequence, for state transition
     CHECK_LAST: process (currentIndex) is
     begin
-        if (currentIndex < 5) then
+        if (currentIndex = 5) then
             lastTermMode <= ACTIVE;
         else
             lastTermMode <= (not ACTIVE);
@@ -315,28 +354,37 @@ begin
         -- convert to integer index
         index := to_integer(unsigned(currentTerm));
         
-        -- turn off all leds, except current term
+        -- turn off all leds
         led <= (others => not ACTIVE);
-        led(currentTerm) <= ACTIVE;
+        
+        -- show the current term if in a sequence
+        if (showSeqMode = ACTIVE) then
+            led(index) <= ACTIVE;
+        end if;
     end process;
 
     -- convert current term to bcd digits
-    BCD_TENS: segTens <= std_logic_vector(to_unsigned(currentTerm / 10));
-    BCD_ONES: segOnes <= std_logic_vector(to_unsigned(currentTerm mod 10));
+    BCD_TENS: segTens <= std_logic_vector(unsigned(currentTerm) / 10);
+    BCD_ONES: segOnes <= std_logic_vector(unsigned(currentTerm) mod 10);
 
-    -- blank leading digit if zero
-    -- in : segTens
+    -- blank leading digit if zero, or no sequence
+    -- in : segTens, showSeqMode
     -- out: blankTens
-    CHECK_TENS: process (segTens) is
+    CHECK_TENS: process (segTens, showSeqMode) is
     begin
-        if (segTens = "0000") then
+        if (segTens = "0000") or (showSeqMode /= ACTIVE) then
             blankTens <= ACTIVE;
         else
             blankTens <= (not ACTIVE);
         end if;
     end process;
+    
+    -- blank ones if no sequence
+    blankOnes <= not showSeqMode;
 
-    -- todo: drive seven seg output
+    -- drive seven seg output
+    -- in : (reset, clock) segTens, segOnes, blankTens
+    -- out: seg, an
     DRIVE_SEG: SevenSegmentDriver port map(
         reset => reset,
         clock => clock,
@@ -349,7 +397,7 @@ begin
         blank3 => ACTIVE,
         blank2 => ACTIVE,
         blank1 => blankTens,
-        blank0 => (not ACTIVE),
+        blank0 => blankOnes,
 
         sevenSegs => seg,
         anodes => an

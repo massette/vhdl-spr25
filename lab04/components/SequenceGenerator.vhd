@@ -51,7 +51,7 @@ architecture SequenceGenerator_ARCH of SequenceGenerator is
     signal seed: integer range 0 to MAX;
     
     -- make sequence
-    signal termsBits: std_logic_vector(19 downto 0);
+    signal seedBits: std_logic_vector(19 downto 0);
 begin
     -- counter always running to generate seed
     -- in : (clock, reset)
@@ -104,4 +104,4 @@ begin
 
     random5 <= not seedBits( 5) &     seedBits(14)
              & not seedBits(15) &     seedBits( 4);
-end PatternGenerator_ARCH;
+end SequenceGenerator_ARCH;
