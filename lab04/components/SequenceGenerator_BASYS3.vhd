@@ -189,7 +189,7 @@ begin
     end process;
 
     -- determine state outputs and next state
-    -- in : currentState, readyEn, nextEn, lastTermMode
+    -- in : currentState, readyEn, hideEn, nextEn, lastTermMode
     -- out: nextState, loadSeqEn, showSeqMode
     SEQ_TRANS: process (currentState, readyEn, hideEn, nextEn, lastTermMode) is
     begin
@@ -263,7 +263,7 @@ begin
     end process;
     
     -- generate 2.5Hz pulse signal, from beginning of term
-    -- in : (reset, clock) nextEn
+    -- in : (reset, clock) loadSeqEn, nextEn
     -- out: hideEn
     MAKE_HIDE_TIMER: process(reset, clock) is
         variable count: integer range 0 to (BLANK_PERIOD / CLOCK_PERIOD);
@@ -274,7 +274,7 @@ begin
             -- set default
             hideEn <= (not ACTIVE);
             
-            if (nextEn = ACTIVE) then
+            if (loadSeqEn = ACTIVE) or (nextEn = ACTIVE) then
                 -- clear when loading a new term
                 count := 0;
             elsif count < (BLANK_PERIOD / CLOCK_PERIOD) then
@@ -305,7 +305,7 @@ begin
     );
 
     -- select current term in sequence
-    -- in : (reset, clock) nextEn
+    -- in : (reset, clock) loadSeqEn, nextEn
     -- out: currentIndex
     SELECT_TERM: process (reset, clock) is
     begin
@@ -336,6 +336,8 @@ begin
                    seqTerm5 when 5;
 
     -- check if we're on the final term of the sequence, for state transition
+    -- in : currentIndex
+    -- out: lastTermMode
     CHECK_LAST: process (currentIndex) is
     begin
         if (currentIndex = 5) then
@@ -346,9 +348,9 @@ begin
     end process;
 
     -- drive led outputs
-    -- in : currentTerm
+    -- in : currentTerm, showSeqMode
     -- out: led
-    DRIVE_LED: process (currentTerm) is
+    DRIVE_LED: process (currentTerm, showSeqMode) is
         variable index: integer range 0 to 15;
     begin
         -- convert to integer index
@@ -372,10 +374,10 @@ begin
     -- out: blankTens
     CHECK_TENS: process (segTens, showSeqMode) is
     begin
-        if (segTens = "0000") or (showSeqMode /= ACTIVE) then
+        if (segTens = "0000") then
             blankTens <= ACTIVE;
         else
-            blankTens <= (not ACTIVE);
+            blankTens <= (not showSeqMode);
         end if;
     end process;
     
