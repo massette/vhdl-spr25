@@ -50,6 +50,27 @@ architecture SequenceGenerator_BASYS3_ARCH of SequenceGenerator_BASYS3 is
     constant TIMER_PERIOD: time := 200 ms;
     
     ----------------------------------------------------------------COMPONENTS--
+    -- button input
+    component Debouncer is
+        port(
+            reset: in std_logic;
+            clock: in std_logic;
+
+            asyncIn: in std_logic;
+            syncOut: out std_logic;
+        );
+    end component;
+    
+    component LevelDetector is
+        port(
+            reset: in std_logic;
+            clock: in std_logic;
+
+            trigger: in std_logic;
+            pulseOut: out std_logic
+        );
+    end component;
+
     -- uut
     component SequenceGenerator is
         port(
@@ -66,12 +87,34 @@ architecture SequenceGenerator_BASYS3_ARCH of SequenceGenerator_BASYS3 is
         );
     end component;
 
+    -- display drivers
+    component SevenSegmentDriver is
+        port(
+            reset: in std_logic;
+            clock: in std_logic;
+
+            digit3: in std_logic_vector(3 downto 0);    --leftmost digit
+            digit2: in std_logic_vector(3 downto 0);    --2nd from left digit
+            digit1: in std_logic_vector(3 downto 0);    --3rd from left digit
+            digit0: in std_logic_vector(3 downto 0);    --rightmost digit
+
+            blank3: in std_logic;    --leftmost digit
+            blank2: in std_logic;    --2nd from left digit
+            blank1: in std_logic;    --3rd from left digit
+            blank0: in std_logic;    --rightmost digit
+
+            sevenSegs: out std_logic_vector(6 downto 0);    --MSB=g, LSB=a
+            anodes:    out std_logic_vector(3 downto 0)    --MSB=leftmost digit
+        );
+    end component;
+
     -------------------------------------------------------------------SIGNALS--
     -- async signals
     signal reset: std_logic;
     signal clock: std_logic;
     
     -- handle inputs
+    signal btnRSync: std_logic;
     signal readyEn: std_logic;
 
     -- timer
@@ -93,22 +136,39 @@ architecture SequenceGenerator_BASYS3_ARCH of SequenceGenerator_BASYS3 is
     signal seqTerm5: std_logic_vector(3 downto 0);
 
     -- multiplex terms
+    signal currentIndex: integer range 1 to 5;
     signal currentTerm: integer range 0 to 15;
     signal lastTermMode: std_logic;
+
+    -- seven segment driver
+    signal segTens: std_logic_vector(3 downto 0);
+    signal segOnes: std_logic_vector(3 downto 0);
+    signal blankTens: std_logic;
 begin
     -- map asynchronous signals
     reset <= btnD;
     clock <= clk;
 
     -- synchronize and debounce asynchronous button input
-    -- in : (reset, clock) btnD
-    -- out: readyEn
-    SYNC_READY: ButtonTrigger port map(
+    -- in : (reset, clock) btnR
+    -- out: btnRSync
+    SYNC_READY: Debouncer port map(
         reset => reset,
         clock => clock,
 
-        buttonRaw => btnR,
-        pulseEn => readyEn
+        asyncIn => btnR,
+        syncOut => btnRSync
+    );
+
+    -- only trigger when button is first pressed
+    -- in : (reset, clock) btnRSync
+    -- out: readyEn
+    DETECT_READY: LevelDetector port map(
+        reset => reset,
+        clock => clock,
+
+        trigger => btnRSync,
+        pulseOut => readyEn
     );
 
     -- store and update state
@@ -207,61 +267,73 @@ begin
 
     -- select current term in sequence
     -- in : (reset, clock) nextEn
-    -- out: currentTerm, lastTermMode
+    -- out: currentIndex
     SELECT_TERM: process (reset, clock) is
-        -- index of current term
-        variable i: integer range 1 to 5;
     begin
         if (reset = ACTIVE) then
-            i := 1;
-            currentTerm <= 0;
-            lastTermMode <= (not ACTIVE);
+            currentIndex <= 1;
         elsif rising_edge(clock) then
-            -- set default
-            lastTermMode <= (not ACTIVE);
-            
             -- update index
             if (loadSeqTerm = ACTIVE) then
                 -- clear when reading new sequence
-                i := 1;
+                currentIndex <= 1;
             elsif (nextEn = ACTIVE) then
                 -- increment index
-                if (i < 5) then
-                    i := i + 1;
+                if (currentIndex < 5) then
+                    currentIndex <= currentIndex + 1;
                 else
-                    i := 1;
+                    currentIndex <= 1;
                 end if;
             end if;
+        end if;
+    end process;
 
-            -- set current term
-            case (i) is
-                when 1 =>
-                    currentTerm <= seqTerm1;
-                when 2 =>
-                    currentTerm <= seqTerm2;
-                when 3 =>
-                    currentTerm <= seqTerm3;
-                when 4 =>
-                    currentTerm <= seqTerm4;
-                when others =>
-                    currentTerm <= seqTerm5;
-                    lastTermMode <= ACTIVE;
-            end case;
+    -- load selected term from sequence generator
+    with currentIndex select
+    currentTerm <= seqTerm1 when 1,
+                   seqTerm2 when 2,
+                   seqTerm3 when 3,
+                   seqTerm4 when 4,
+                   seqTerm5 when 5;
+
+    -- check if we're on the final term of the sequence, for state transition
+    CHECK_LAST: process (currentIndex) is
+    begin
+        if (currentIndex < 5) then
+            lastTermMode <= ACTIVE;
+        else
+            lastTermMode <= (not ACTIVE);
         end if;
     end process;
 
     -- drive led outputs
     -- in : currentTerm
     -- out: led
-    DRIVE_LED: process (seqTerm) is
+    DRIVE_LED: process (currentTerm) is
         variable index: integer range 0 to 15;
     begin
         -- convert to integer index
-        index := to_integer(unsigned(seqTerm));
+        index := to_integer(unsigned(currentTerm));
         
         -- turn off all leds, except current term
         led <= (others => not ACTIVE);
         led(currentTerm) <= ACTIVE;
+    end process;
+
+    -- convert current term to bcd digits
+    BCD_TENS: segTens <= std_logic_vector(to_unsigned(currentTerm / 10));
+    BCD_ONES: segOnes <= std_logic_vector(to_unsigned(currentTerm mod 10));
+
+    -- blank leading digit if zero
+    -- in : segTens
+    -- out: blankTens
+    CHECK_TENS: process (segTens) is
+    begin
+        if (segTens = "0000") then
+            blankTens <= ACTIVE;
+        else
+            blankTens <= (not ACTIVE);
+        end if;
     end process;
 
     -- todo: drive seven seg output
@@ -269,9 +341,15 @@ begin
         reset => reset,
         clock => clock,
 
-        -- ... digits
+        digit3 => "0000",
+        digit2 => "0000",
+        digit1 => segTens,
+        digit0 => segOnes,
 
-        -- ... blanks
+        blank3 => ACTIVE,
+        blank2 => ACTIVE,
+        blank1 => blankTens,
+        blank0 => (not ACTIVE),
 
         sevenSegs => seg,
         anodes => an
